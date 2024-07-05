@@ -1,0 +1,71 @@
+version: "2"
+
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - backend
+      - database
+
+  bot:
+    build: 
+      context: .
+      dockerfile: vtv-scrapy.Dockerfile
+    container_name: bot
+    environment:
+      MONGO_URI: "mongodb://mongodb:27017"
+      MONGO_DB: "vtv_news_db_prod"
+      STORING_COLLECTION: "thegioi_news"
+      SCRAPY_MODE: prod
+      INTERVAL: 300
+    networks:
+      - backend
+      - database
+    depends_on:
+      - mongodb
+
+  api:
+    build: 
+      context: .
+      dockerfile: fast-api.Dockerfile
+    container_name: api
+    environment:
+      MONGODB_URI: "mongodb://mongodb:27017"
+      MONGO_DB: "vtv_news_db_prod"
+      STORING_COLLECTION: "thegioi_news"
+      SCRAPY_MODE: "prod"
+    ports:
+      - "8000:8000"
+    networks:
+      - backend
+      - frontend
+    depends_on:
+      - mongodb
+
+  reverse-proxy:
+    image: nginx:latest
+    container_name: reverse-proxy
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - frontend
+    depends_on:
+      - api
+
+networks:
+  backend:
+    driver: bridge
+  database:
+    driver: bridge
+  frontend:
+    driver: bridge
+
+volumes:
+  mongo-data:
